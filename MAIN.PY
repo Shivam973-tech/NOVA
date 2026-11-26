@@ -4,10 +4,11 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import os
 import re
 
 # ---------------------------------------------------------------
-# 1. RISK DATABASE (a small made-up list; add your own entries)
+# 1. RISK DATABASE (add your own entries)
 # ---------------------------------------------------------------
 RISK_DOMAINS = [
     "free-gift-claim.xyz",
@@ -24,26 +25,37 @@ RISK_PAYMENT_IDS = [
 ]
 
 # ---------------------------------------------------------------
-# 2. SCAM KEYWORDS: (keyword, points added, explanation)
+# 2. SCAM / SPAM KEYWORDS: (keyword, points, explanation)
 # ---------------------------------------------------------------
 SCAM_KEYWORDS = [
     ("urgent", 10, "Uses urgency to pressure you ('urgent')"),
     ("immediately", 10, "Pressures you to act immediately"),
+    ("act now", 10, "Pressures you to 'act now'"),
+    ("limited offer", 10, "Uses a 'limited offer' pressure tactic"),
+    ("last chance", 10, "Uses a 'last chance' pressure tactic"),
     ("account blocked", 20, "Threatens that your account will be blocked"),
     ("account suspended", 20, "Threatens that your account will be suspended"),
+    ("account will be closed", 20, "Threatens to close your account"),
     ("kyc", 15, "Mentions KYC update, a very common scam trick"),
     ("lottery", 25, "Mentions a lottery, which is usually fake"),
     ("you have won", 25, "Claims that you have won a prize"),
+    ("congratulations", 10, "Starts with 'congratulations', common in prize scams"),
     ("winner", 15, "Calls you a 'winner'"),
     ("prize", 15, "Mentions a prize"),
+    ("claim your", 15, "Asks you to claim something"),
     ("otp", 20, "Asks about your OTP (never share it with anyone)"),
     ("pin", 10, "Mentions a PIN (never share it)"),
     ("cvv", 25, "Asks for your CVV (never share it)"),
+    ("password", 15, "Mentions your password (never share it)"),
     ("refund", 10, "Mentions a refund, often used to trick people"),
+    ("loan approved", 20, "Mentions a surprise loan approval"),
     ("click here", 15, "Asks you to 'click here'"),
     ("verify your", 10, "Asks you to verify your details"),
+    ("update your", 10, "Asks you to update your details"),
     ("send money", 20, "Asks you to send money"),
     ("gift card", 20, "Asks for gift cards"),
+    ("work from home", 15, "Mentions an easy 'work from home' job offer"),
+    ("earn money", 15, "Promises easy money"),
     ("free", 5, "Offers something 'free'"),
 ]
 
@@ -73,6 +85,11 @@ def get_host(url):
     if "@" in host:                         # user@host trick
         host = host.split("@")[-1]
     return host
+
+
+def has_word(word, text):
+    """True if the word appears as a whole word (so 'pin' does not match 'shipping')."""
+    return re.search(r"\b" + re.escape(word) + r"\b", text) is not None
 
 
 def check_url(url, reasons):
@@ -126,125 +143,4 @@ def check_url(url, reasons):
     for brand in BRAND_WORDS:
         if brand in host and not host.endswith(brand + ".com") and not host.endswith(brand + ".in"):
             points += 20
-            reasons.append("Domain pretends to be '" + brand + "' but is not the official site")
-            break
-
-    return points
-
-
-def check_payment_id(pid, reasons):
-    """Check one payment ID (like name@bank) and return points."""
-    points = 0
-    pid = pid.lower()
-
-    if pid in RISK_PAYMENT_IDS:
-        points += 60
-        reasons.append("Payment ID '" + pid + "' is in our known scam database")
-    else:
-        for word in SUSPICIOUS_ID_WORDS:
-            if word in pid:
-                points += 25
-                reasons.append("Payment ID '" + pid + "' contains the suspicious word '" + word + "'")
-                break
-    return points
-
-
-def scan(text):
-    """Scan the text and return the result dictionary."""
-    score = 0
-    reasons = []
-    lower = text.lower()
-
-    # Step 1: scam keywords
-    for word, points, why in SCAM_KEYWORDS:
-        if word in lower:
-            score += points
-            reasons.append(why)
-
-    # Step 2: find links and check each one
-    urls = re.findall(r"(?:https?://|www\.)[^\s]+", text)
-    for url in urls:
-        score += check_url(url, reasons)
-
-    # Step 3: bare domains in the risk database (no http:// in the text)
-    if not urls:
-        for bad in RISK_DOMAINS:
-            if bad in lower:
-                score += 50
-                reasons.append("'" + bad + "' is in our known scam database")
-
-    # Step 4: payment IDs like name@bank (skip text that is part of a link)
-    text_without_urls = re.sub(r"(?:https?://|www\.)[^\s]+", " ", text)
-    pids = re.findall(r"[a-zA-Z0-9._\-]{2,}@[a-zA-Z]{2,}", text_without_urls)
-    for pid in pids:
-        score += check_payment_id(pid, reasons)
-
-    # Keep score between 0 and 100
-    if score > 100:
-        score = 100
-
-    # Step 5: choose the verdict and color
-    if score >= 60:
-        verdict, color = "DANGEROUS", "red"
-    elif score >= 25:
-        verdict, color = "SUSPICIOUS", "orange"
-    else:
-        verdict, color = "SAFE", "green"
-        if len(reasons) == 0:
-            reasons.append("No scam keywords, bad links or risky payment IDs found")
-
-    return {"score": score, "verdict": verdict, "color": color, "reasons": reasons}
-
-
-# ---------------------------------------------------------------
-# 4. WEB SERVER
-# (BaseHTTPRequestHandler is the one class Python's http.server needs)
-# ---------------------------------------------------------------
-class Handler(BaseHTTPRequestHandler):
-
-    def send_cors_headers(self):
-        # CORS headers let the browser page talk to this server
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-
-    def do_OPTIONS(self):
-        # Browser asks permission first (preflight request)
-        self.send_response(204)
-        self.send_cors_headers()
-        self.end_headers()
-
-    def do_POST(self):
-        if self.path != "/api/scan":
-            self.send_response(404)
-            self.send_cors_headers()
-            self.end_headers()
-            return
-
-        try:
-            length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length).decode("utf-8"))
-            text = str(body.get("text", "")).strip()
-            if text == "":
-                result = {"error": "Please paste some text first"}
-                status = 400
-            else:
-                result = scan(text)
-                status = 200
-        except Exception:
-            result = {"error": "Invalid request"}
-            status = 400
-
-        data = json.dumps(result).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_cors_headers()
-        self.end_headers()
-        self.wfile.write(data)
-
-
-if __name__ == "__main__":
-    server = HTTPServer(("localhost", 8000), Handler)
-    print("Scam Checker backend running at http://localhost:8000")
-    server.serve_forever()
+            reasons.append("Domain pretends to be")

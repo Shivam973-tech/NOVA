@@ -4,92 +4,197 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Scam Checker</title>
-
   <style>
-    /* Basic page styling */
+    /* ---------- Page background (CSS only) ---------- */
+    html { background: #020b06; }
     body {
-      font-family: Arial, sans-serif;
-      background: #f2f4f8;
       margin: 0;
       padding: 20px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      font-family: "Courier New", monospace;
+      color: #b6ffd6;
+      background-color: #020b06;
+      background-image:
+        radial-gradient(circle at 15% 20%, rgba(0,255,136,0.25), transparent 35%),
+        radial-gradient(circle at 85% 80%, rgba(0,229,255,0.22), transparent 35%),
+        linear-gradient(rgba(0,255,136,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,0.08) 1px, transparent 1px);
+      background-size: auto, auto, 32px 32px, 32px 32px;
+      animation: moveGrid 6s linear infinite;
     }
+    @keyframes moveGrid {
+      from { background-position: 0 0, 0 0, 0 0, 0 0; }
+      to   { background-position: 0 0, 0 0, 0 32px, 32px 0; }
+    }
+
+    /* Scan line moving down the screen */
+    body::before {
+      content: "";
+      position: fixed;
+      left: 0; top: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(0,255,136,0.5);
+      box-shadow: 0 0 15px #00ff88;
+      pointer-events: none;
+      animation: scan 5s linear infinite;
+    }
+    @keyframes scan {
+      from { transform: translateY(-10px); }
+      to   { transform: translateY(100vh); }
+    }
+
+    /* ---------- Main card ---------- */
     .box {
-      max-width: 600px;
+      position: relative;
+      max-width: 620px;
       margin: 30px auto;
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 28px;
+      background: rgba(2, 15, 9, 0.92);
+      border: 1px solid #00ff88;
+      border-radius: 12px;
+      box-shadow: 0 0 25px rgba(0,255,136,0.45);
     }
-    h1 { margin-top: 0; text-align: center; }
+    .icon { text-align: center; font-size: 48px; }
+    h1 {
+      margin: 0 0 5px 0;
+      text-align: center;
+      color: #00ff88;
+      letter-spacing: 3px;
+      text-shadow: 0 0 10px #00ff88;
+    }
+    h1::after { content: "_"; animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .subtitle { text-align: center; color: #00e5ff; margin-bottom: 20px; font-size: 14px; }
+    .prompt { color: #ffd700; }
+
+    /* ---------- Input, examples, button ---------- */
     textarea {
       width: 100%;
       height: 120px;
-      padding: 10px;
+      padding: 12px;
       font-size: 15px;
+      font-family: "Courier New", monospace;
       box-sizing: border-box;
-      border: 1px solid #aaa;
-      border-radius: 6px;
+      color: #00ff88;
+      background: #000;
+      border: 1px solid #00e5ff;
+      border-radius: 8px;
+      outline: none;
+      resize: vertical;
     }
+    textarea::placeholder { color: #3d8a68; }
+    textarea:focus { border-color: #00ff88; box-shadow: 0 0 10px rgba(0,255,136,0.6); }
+
+    .examples { margin-top: 10px; font-size: 13px; color: #ffd700; }
+    .examples button {
+      width: auto;
+      margin: 4px 4px 0 0;
+      padding: 5px 10px;
+      font-size: 12px;
+      letter-spacing: 0;
+      color: #00e5ff;
+      background: transparent;
+      border: 1px solid #00e5ff;
+      border-radius: 6px;
+      box-shadow: none;
+    }
+    .examples button:hover { background: #00e5ff; color: #000; }
+
     button {
       width: 100%;
-      margin-top: 10px;
-      padding: 12px;
-      font-size: 16px;
-      background: #2d6cdf;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover { background: #1f55b8; }
-
-    /* Result area */
-    #result { display: none; margin-top: 20px; }
-    .verdict {
-      padding: 15px;
-      border-radius: 8px;
-      color: white;
-      text-align: center;
-      font-size: 22px;
+      margin-top: 12px;
+      padding: 13px;
+      font-size: 17px;
       font-weight: bold;
+      font-family: "Courier New", monospace;
+      letter-spacing: 2px;
+      color: #000;
+      background: #00ff88;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(0,255,136,0.6);
     }
-    /* Color codes for the verdict */
-    .green  { background: #28a745; }
-    .orange { background: #f0932b; }
-    .red    { background: #dc3545; }
+    button:hover { background: #00e5ff; }
 
-    .score { text-align: center; margin: 10px 0; font-size: 16px; }
-    ul { padding-left: 20px; }
-    li { margin-bottom: 6px; }
-    #error { color: #dc3545; margin-top: 15px; text-align: center; }
+    /* ---------- Result ---------- */
+    #result { display: none; margin-top: 22px; }
+    .verdict {
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      background: #000;
+    }
+    .green  { color: #00ff88; border: 2px solid #00ff88; box-shadow: 0 0 15px #00ff88; }
+    .orange { color: #ffa500; border: 2px solid #ffa500; box-shadow: 0 0 15px #ffa500; }
+    .red    { color: #ff3b3b; border: 2px solid #ff3b3b; box-shadow: 0 0 15px #ff3b3b; }
+
+    .score { text-align: center; margin: 12px 0 6px 0; color: #ffd700; }
+    .bar-back { height: 12px; background: #0b2a1b; border: 1px solid #1d5c3f; border-radius: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 0%; transition: width 0.6s; }
+
+    h3 { color: #00e5ff; }
+    ul { padding-left: 0; list-style: none; }
+    li {
+      margin-bottom: 8px;
+      background: rgba(0,255,136,0.07);
+      border-left: 3px solid #00ff88;
+      padding: 8px 10px;
+      color: #d6ffe9;
+    }
+    li::before { content: "[!] "; color: #ff3b3b; font-weight: bold; }
+    #error { color: #ff3b3b; margin-top: 15px; text-align: center; font-weight: bold; }
   </style>
 </head>
 <body>
 
   <div class="box">
-    <h1>Scam Checker</h1>
-    <p>Paste an SMS, a link or a payment ID (like name@bank):</p>
+    <div class="icon">🛡️</div>
+    <h1>SCAM CHECKER</h1>
+    <div class="subtitle"><span class="prompt">&gt;</span> Paste an SMS, a link or a payment ID (like name@bank)</div>
 
     <textarea id="inputText" placeholder="Example: URGENT! Your KYC is expired. Click here http://sbi-kyc-update.top"></textarea>
-    <button onclick="checkScam()">Check Now</button>
+
+    <div class="examples">
+      Try an example:
+      <button onclick="useExample(0)">Red</button>
+      <button onclick="useExample(1)">Orange</button>
+      <button onclick="useExample(2)">Green</button>
+    </div>
+
+    <button onclick="checkScam()">[ SCAN NOW ]</button>
 
     <div id="error"></div>
 
-    <!-- Result is hidden until we get an answer -->
     <div id="result">
       <div id="verdict" class="verdict"></div>
       <div class="score" id="score"></div>
-      <h3>Why?</h3>
+      <div class="bar-back"><div id="barFill" class="bar-fill"></div></div>
+      <h3>&gt; Why?</h3>
       <ul id="reasons"></ul>
     </div>
   </div>
 
   <script>
-    // Address of our Python backend
-    var API_URL = "http://localhost:8000/api/scan";
+    // Backend address (short path from port 8000, full address otherwise)
+    var API_URL = (location.port === "8000") ? "/api/scan" : "http://localhost:8000/api/scan";
 
-    // Runs when the user clicks "Check Now"
+    // Example messages for the quick buttons
+    var examples = [
+      "URGENT! Your KYC is expired. Click here http://sbi-kyc-update.top",
+      "Pay the refund to refund.help@paytm",
+      "Hi, are we meeting at 7 PM for dinner tonight?"
+    ];
+    function useExample(n) {
+      document.getElementById("inputText").value = examples[n];
+    }
+
+    // Runs when the scan button is clicked
     function checkScam() {
       var text = document.getElementById("inputText").value.trim();
       var errorBox = document.getElementById("error");
@@ -103,7 +208,6 @@
         return;
       }
 
-      // Send the text to the backend
       fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,22 +226,26 @@
         });
     }
 
-    // Show the verdict, score and reasons on the page
+    // Show verdict, score bar and reasons
     function showResult(data) {
       var verdictBox = document.getElementById("verdict");
       verdictBox.textContent = data.verdict;
-      verdictBox.className = "verdict " + data.color;   // applies green/orange/red
+      verdictBox.className = "verdict " + data.color;
 
       document.getElementById("score").textContent = "Risk score: " + data.score + " / 100";
+
+      var colors = { green: "#00ff88", orange: "#ffa500", red: "#ff3b3b" };
+      var bar = document.getElementById("barFill");
+      bar.style.background = colors[data.color];
+      bar.style.width = data.score + "%";
 
       var list = document.getElementById("reasons");
       list.innerHTML = "";
       for (var i = 0; i < data.reasons.length; i++) {
         var item = document.createElement("li");
-        item.textContent = data.reasons[i];   // textContent is safe from HTML injection
+        item.textContent = data.reasons[i];
         list.appendChild(item);
       }
-
       document.getElementById("result").style.display = "block";
     }
   </script>
