@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scam Checker</title>
+
+  <style>
+    /* Basic page styling */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f4f8;
+      margin: 0;
+      padding: 20px;
+    }
+    .box {
+      max-width: 600px;
+      margin: 30px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    h1 { margin-top: 0; text-align: center; }
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+      border: 1px solid #aaa;
+      border-radius: 6px;
+    }
+    button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px;
+      font-size: 16px;
+      background: #2d6cdf;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: #1f55b8; }
+
+    /* Result area */
+    #result { display: none; margin-top: 20px; }
+    .verdict {
+      padding: 15px;
+      border-radius: 8px;
+      color: white;
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+    }
+    /* Color codes for the verdict */
+    .green  { background: #28a745; }
+    .orange { background: #f0932b; }
+    .red    { background: #dc3545; }
+
+    .score { text-align: center; margin: 10px 0; font-size: 16px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    #error { color: #dc3545; margin-top: 15px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="box">
+    <h1>Scam Checker</h1>
+    <p>Paste an SMS, a link or a payment ID (like name@bank):</p>
+
+    <textarea id="inputText" placeholder="Example: URGENT! Your KYC is expired. Click here http://sbi-kyc-update.top"></textarea>
+    <button onclick="checkScam()">Check Now</button>
+
+    <div id="error"></div>
+
+    <!-- Result is hidden until we get an answer -->
+    <div id="result">
+      <div id="verdict" class="verdict"></div>
+      <div class="score" id="score"></div>
+      <h3>Why?</h3>
+      <ul id="reasons"></ul>
+    </div>
+  </div>
+
+  <script>
+    // Address of our Python backend
+    var API_URL = "http://localhost:8000/api/scan";
+
+    // Runs when the user clicks "Check Now"
+    function checkScam() {
+      var text = document.getElementById("inputText").value.trim();
+      var errorBox = document.getElementById("error");
+      var resultBox = document.getElementById("result");
+
+      errorBox.textContent = "";
+      resultBox.style.display = "none";
+
+      if (text === "") {
+        errorBox.textContent = "Please paste something first.";
+        return;
+      }
+
+      // Send the text to the backend
+      fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text })
+      })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+          if (data.error) {
+            errorBox.textContent = data.error;
+            return;
+          }
+          showResult(data);
+        })
+        .catch(function () {
+          errorBox.textContent = "Cannot reach the backend. Is main.py running?";
+        });
+    }
+
+    // Show the verdict, score and reasons on the page
+    function showResult(data) {
+      var verdictBox = document.getElementById("verdict");
+      verdictBox.textContent = data.verdict;
+      verdictBox.className = "verdict " + data.color;   // applies green/orange/red
+
+      document.getElementById("score").textContent = "Risk score: " + data.score + " / 100";
+
+      var list = document.getElementById("reasons");
+      list.innerHTML = "";
+      for (var i = 0; i < data.reasons.length; i++) {
+        var item = document.createElement("li");
+        item.textContent = data.reasons[i];   // textContent is safe from HTML injection
+        list.appendChild(item);
+      }
+
+      document.getElementById("result").style.display = "block";
+    }
+  </script>
+
+</body>
+</html>
