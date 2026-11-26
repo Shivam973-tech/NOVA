@@ -19,7 +19,4 @@ We made this project as a team to help people check whether a message, link or p
 2. Open `Frontend/index.html` in the browser
 3. Paste a message and click Check Now
 
-## Team
-- Shivam S. - (add your role, e.g. Frontend)
-- (Teammate name) - (role, e.g. Backend)
 
